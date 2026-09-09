@@ -30,6 +30,16 @@
   }
   .cal { width: 100%; background: var(--bg); border-radius: 18px; padding: clamp(12px, 4vw, 22px); }
   .head { display: flex; align-items: baseline; gap: .4em; margin: 0 0 clamp(8px, 2.5vw, 14px) 2px; }
+  .nav { margin-left: auto; display: flex; gap: 2px; align-self: center; }
+  .nav button {
+    all: unset; cursor: pointer; width: 1.7em; height: 1.7em; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: clamp(13px, 3.8vw, 16px);
+  }
+  .nav button:hover { background: var(--accent-soft); color: var(--accent); }
+  .nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .nav svg { width: .6em; height: .6em; stroke: currentColor; stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .today-btn { cursor: pointer; }
   .head .month { color: var(--accent); font-weight: 700; font-size: clamp(15px, 4.6vw, 20px); letter-spacing: .01em; }
   .head .year  { color: var(--muted);  font-weight: 500; font-size: clamp(13px, 3.8vw, 16px); }
 
@@ -66,7 +76,13 @@
 </head>
 <body>
   <div class="cal" role="group" aria-label="Month calendar">
-    <div class="head"><span class="month" id="month"></span><span class="year" id="year"></span></div>
+    <div class="head">
+      <span class="month today-btn" id="month" title="Back to today"></span><span class="year" id="year"></span>
+      <div class="nav">
+        <button id="prev" aria-label="Previous month"><svg viewBox="0 0 10 10"><path d="M6.5 1.5 3 5l3.5 3.5"/></svg></button>
+        <button id="next" aria-label="Next month"><svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg></button>
+      </div>
+    </div>
     <div class="grid" id="grid"></div>
   </div>
 <script>
@@ -163,35 +179,44 @@ function holiday(date) {
   const MINOR = /Chol HaMoed|Hoshana|Shushan|Lag|Yerushalayim|Tu BiShvat/;
 
   const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth(), t = now.getDate();
-  const first = new Date(y, m, 1);
-  const days = new Date(y, m + 1, 0).getDate();
-
-  document.getElementById("month").textContent = first.toLocaleString("en-US", { month: "long" });
-  document.getElementById("year").textContent = y;
-
+  let y = now.getFullYear(), m = now.getMonth();
   const grid = document.getElementById("grid");
   const add = (cls, html) => { const d = document.createElement("div"); d.className = cls; d.innerHTML = html; grid.appendChild(d); };
 
-  for (let i = 0; i < 7; i++) add("dow", DOW[(WEEK_START + i) % 7]);
+  function render() {
+    const first = new Date(y, m, 1);
+    const days = new Date(y, m + 1, 0).getDate();
+    const isThisMonth = y === now.getFullYear() && m === now.getMonth();
+    document.getElementById("month").textContent = first.toLocaleString("en-US", { month: "long" });
+    document.getElementById("year").textContent = y;
+    grid.innerHTML = "";
 
-  const lead = (first.getDay() - WEEK_START + 7) % 7;
-  const cells = [];
-  for (let i = lead; i > 0; i--) cells.push({ date: new Date(y, m, 1 - i), other: true });
-  for (let d = 1; d <= days; d++) cells.push({ date: new Date(y, m, d), today: d === t });
-  let next = 1;
-  while (cells.length % 7) cells.push({ date: new Date(y, m + 1, next++), other: true });
+    for (let i = 0; i < 7; i++) add("dow", DOW[(WEEK_START + i) % 7]);
 
-  for (const c of cells) {
-    const dow = c.date.getDay();
-    let cls = "day";
-    if (c.other) cls += " other";
-    else if (WEEKEND.has(dow)) cls += " weekend";
-    if (c.today) cls += " today";
-    const h = holiday(c.date);
-    const tag = h ? `<span class="tag${MINOR.test(h) ? " minor" : ""}">${h}</span>` : "";
-    add(cls, `<span class="num">${c.date.getDate()}</span>${tag}`);
+    const lead = (first.getDay() - WEEK_START + 7) % 7;
+    const cells = [];
+    for (let i = lead; i > 0; i--) cells.push({ date: new Date(y, m, 1 - i), other: true });
+    for (let d = 1; d <= days; d++) cells.push({ date: new Date(y, m, d), today: isThisMonth && d === now.getDate() });
+    let next = 1;
+    while (cells.length % 7) cells.push({ date: new Date(y, m + 1, next++), other: true });
+
+    for (const c of cells) {
+      const dow = c.date.getDay();
+      let cls = "day";
+      if (c.other) cls += " other";
+      else if (WEEKEND.has(dow)) cls += " weekend";
+      if (c.today) cls += " today";
+      const h = holiday(c.date);
+      const tag = h ? `<span class="tag${MINOR.test(h) ? " minor" : ""}">${h}</span>` : "";
+      add(cls, `<span class="num">${c.date.getDate()}</span>${tag}`);
+    }
   }
+
+  const shift = n => { m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } render(); };
+  document.getElementById("prev").onclick = () => shift(-1);
+  document.getElementById("next").onclick = () => shift(1);
+  document.getElementById("month").onclick = () => { y = now.getFullYear(); m = now.getMonth(); render(); };
+  render();
 </script>
 </body>
 </html>
